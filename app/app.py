@@ -1,4 +1,9 @@
 # app/app.py
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+from utils.pdf_export import export_patient_report
+from utils.info_panel import get_info_html
 import streamlit as st
 import numpy as np
 from joblib import load
@@ -132,4 +137,5 @@ if submitted:
         "PIV": round(PIV,2)
     }
     export_patient_report(pdf_path, inputs, p, cls, recommendation)
+
     st.success(f"Report PDF salvato: {pdf_path}")
