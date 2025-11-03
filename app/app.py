@@ -1,45 +1,36 @@
 # app/app.py
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-from utils.pdf_export import export_patient_report
-from utils.info_panel import get_info_html
+import os
+import sys
 import streamlit as st
 import numpy as np
 from joblib import load
-from utils.pdf_export import export_patient_report
-from utils.info_panel import get_info_html
-import os
-from datetime import datetime
+
+# Fix per importare moduli dalla root del progetto
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+from utils.info_panel import get_info_html  # solo info_panel, niente pdf_export
 
 # --- LOGIN SEMPLICE ---
-import streamlit as st
-
-# Imposta la password
 PASSWORD = "Imprintfpg2025"
-
-# Campo di input per la password
 st.sidebar.subheader("🔒 Accesso")
 password = st.sidebar.text_input("Inserisci la password", type="password")
-
-# Se la password non è corretta, blocca l'app
 if password != PASSWORD:
     st.error("Accesso negato. Inserisci la password corretta.")
     st.stop()
 
-# Percorsi
-MODEL_PATH = r"C:\Users\marco\PycharmProjects\IMPRINT_pilot\data\imprint_risk_model.joblib"
-EXPORT_DIR = r"C:\Users\marco\PycharmProjects\IMPRINT_pilot\data"
+# --- PATH MODELLO (relativo, funziona anche su Cloud) ---
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "imprint_risk_model.joblib")
+MODEL_PATH = os.path.abspath(MODEL_PATH)
 
-# Configurazione pagina
+# --- Configurazione pagina ---
 st.set_page_config(page_title="IMPRINT Risk Calculator", page_icon="🧮", layout="centered")
 st.title("Calcolatore rischio malignità (IMPRINT)")
 
-# Pannello informativo
+# --- Pannello informativo ---
 with st.expander("Informazioni e cut-off"):
     st.markdown(get_info_html(), unsafe_allow_html=True)
 
-# Form di input
+# --- Form di input ---
 with st.form("risk_form"):
     col1, col2 = st.columns(2)
     age = col1.number_input("Età (anni)", min_value=15, max_value=95, value=50)
@@ -60,7 +51,7 @@ with st.form("risk_form"):
 
     submitted = st.form_submit_button("Calcola rischio")
 
-# Funzioni di classificazione
+# --- Funzioni di classificazione ---
 def classify_risk(p: float) -> str:
     if p < 0.004:
         return "Basso"
@@ -76,9 +67,8 @@ def suggest_action(cls: str) -> str:
         return "Rivalutazione ecografica, ripetere markers; considerare MRI."
     return "Gestione conservativa come leiomioma, follow-up."
 
-# Calcolo e output
+# --- Calcolo e output ---
 if submitted:
-    # Calcolo marker derivati dall’emocromo
     if linfociti > 0:
         NLR = neutrofili / linfociti
         PLR = piastrine / linfociti
@@ -97,10 +87,8 @@ if submitted:
     cls = classify_risk(p)
     recommendation = suggest_action(cls)
 
-    # Output a schermo
     st.markdown(f"### Probabilità di malignità: {p:.3%}")
 
-    # Colori dinamici per la classe di rischio
     if cls == "Basso":
         color = "green"
     elif cls == "Intermedio":
@@ -115,27 +103,3 @@ if submitted:
 
     st.write(recommendation)
     st.caption("Nota: modello pilota addestrato su coorte simulata (benigni). Da ricalibrare con dati reali del centro.")
-
-    # Esporta PDF
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    pdf_path = os.path.join(EXPORT_DIR, f"IMPRINT_patient_report_{ts}.pdf")
-    inputs = {
-        "Età (anni)": age,
-        "Diametro (mm)": diameter,
-        "Margini irregolari": irregular_margins,
-        "Color score 4": color4,
-        "Assenza ombre": shadows_absent,
-        "Neutrofili": neutrofili,
-        "Linfociti": linfociti,
-        "Monociti": monociti,
-        "Eosinofili": eosinofili,
-        "Piastrine": piastrine,
-        "NLR": round(NLR,2),
-        "PLR": round(PLR,2),
-        "SII": round(SII,2),
-        "SIRI": round(SIRI,2),
-        "PIV": round(PIV,2)
-    }
-    export_patient_report(pdf_path, inputs, p, cls, recommendation)
-
-    st.success(f"Report PDF salvato: {pdf_path}")
